@@ -1,4 +1,4 @@
-import { Activity } from "lucide-react";
+import { Activity, CircleDot, Eye, Timer } from "lucide-react";
 import { Pitch } from "../components/Pitch";
 import type { TacticalState } from "../types";
 
@@ -8,24 +8,57 @@ interface ManagerViewProps {
 
 export function ManagerView({ state }: ManagerViewProps) {
   const observed = state.players.filter((player) => player.observed).length;
+  const estimated = state.players.length - observed;
+  const confidence = (state.system_confidence * 100).toFixed(0);
+  const matchTime = (state.timestamp_ms / 1000).toFixed(1);
 
   return (
     <main className="manager-shell">
       <header className="manager-topbar">
         <div>
           <p className="eyebrow">Project FM</p>
-          <h1>Live Tactical Map</h1>
+          <h1>Touchline Tactical Map</h1>
         </div>
-        <div className="status-pill" aria-label="System confidence">
-          <Activity size={18} />
-          {(state.system_confidence * 100).toFixed(0)}%
+        <div className="manager-status-row">
+          <div className="status-pill status-live" aria-label="System confidence">
+            <Activity size={18} />
+            {confidence}%
+          </div>
+          <div className="status-pill">
+            <Eye size={18} />
+            {observed}/22
+          </div>
         </div>
       </header>
-      <Pitch state={state} />
+      <section className="manager-stage">
+        <aside className="match-rail" aria-label="Live match state">
+          <div className="rail-item rail-primary">
+            <span>Phase</span>
+            <strong>{state.phase.replace("_", " ")}</strong>
+          </div>
+          <div className="rail-item">
+            <span>Observed</span>
+            <strong>{observed}</strong>
+          </div>
+          <div className="rail-item">
+            <span>Estimated</span>
+            <strong>{estimated}</strong>
+          </div>
+          <div className="rail-item">
+            <span>Calibration</span>
+            <strong>{state.pitch_calibration.status}</strong>
+          </div>
+        </aside>
+        <Pitch state={state} />
+      </section>
       <footer className="manager-footer">
-        <span>{state.phase.replace("_", " ")}</span>
-        <span>{observed}/22 observed</span>
-        <span>{(state.timestamp_ms / 1000).toFixed(1)}s</span>
+        <span>
+          <CircleDot size={14} /> full-pitch reconstruction
+        </span>
+        <span>
+          <Timer size={14} /> {matchTime}s feed time
+        </span>
+        <span>{estimated} inferred rest-defense positions</span>
       </footer>
     </main>
   );

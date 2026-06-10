@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Monitor, Radio } from "lucide-react";
+import { AlertTriangle, Monitor, Radio, RefreshCw } from "lucide-react";
 import { fetchLatestState } from "./api";
 import { AnalystView } from "./views/AnalystView";
 import { ManagerView } from "./views/ManagerView";
@@ -22,17 +22,43 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (error) {
+      return;
+    }
     loadState();
     const timer = window.setInterval(loadState, 2000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [error]);
 
   if (error) {
-    return <div className="center-state">Backend unavailable: {error}</div>;
+    return (
+      <div className="center-state center-state-panel">
+        <AlertTriangle size={22} />
+        <div>
+          <p className="eyebrow">Connection interrupted</p>
+          <h1>Backend unavailable</h1>
+          <p>{error}</p>
+          <button className="inline-action" onClick={loadState}>
+            <RefreshCw size={16} /> Retry connection
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!state) {
-    return <div className="center-state">Loading tactical state</div>;
+    return (
+      <div className="loading-shell" aria-label="Loading tactical state">
+        <div className="loading-header">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-pill" />
+        </div>
+        <div className="loading-grid">
+          <div className="skeleton skeleton-rail" />
+          <div className="skeleton skeleton-pitch" />
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -29,3 +29,10 @@ npm run dev
 ## Data
 
 Do not commit match videos, model weights, local caches, credentials, or private club/contact data.
+
+## Verification
+
+Current verified slice:
+- Backend schema, ingest, persistence, pipeline, and API tests.
+- Frontend TypeScript/Vite build.
+- Browser QA for manager and analyst views at desktop and tablet widths.
