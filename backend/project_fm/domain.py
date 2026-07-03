@@ -40,6 +40,7 @@ class PlayerState(BaseModel):
     track_id: str
     team: Team
     shirt_number: int | None = Field(default=None, ge=1, le=99)
+    player_name: str | None = Field(default=None, min_length=1, max_length=120)
     role_hint: RoleHint
     pitch_x: float = Field(ge=0, le=105)
     pitch_y: float = Field(ge=0, le=68)

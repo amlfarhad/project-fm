@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from project_fm.domain import CalibrationState, TacticalState
-from project_fm.persistence import MatchStateStore
+from project_fm.persistence import InvalidMatchId, MatchStateStore
+import pytest
 
 
 def test_store_appends_and_reads_tactical_states(tmp_path: Path):
@@ -31,3 +32,10 @@ def test_store_creates_match_directory(tmp_path: Path):
 
     assert path == tmp_path / "match-2"
     assert path.exists()
+
+
+def test_store_rejects_unsafe_match_ids(tmp_path: Path):
+    store = MatchStateStore(root=tmp_path)
+
+    with pytest.raises(InvalidMatchId):
+        store.match_dir(".hidden")

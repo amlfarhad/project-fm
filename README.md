@@ -2,23 +2,72 @@
 
 Project FM is a live tactical reconstruction system for football clubs. It ingests match video as a stream, reconstructs a full-pitch 2D tactical state, and serves manager and analyst web views.
 
-## First Slice
+## Product Capabilities
 
-The first product slice runs on a MacBook Air with full-match files. It treats files as live streams, stores tactical state output, and renders the state in browser clients.
+Project FM runs locally on a MacBook Air for development and can move to a stadium GPU box later. Current capabilities include:
+
+- Full-match file ingestion with OpenCV frame sampling.
+- Stream URL ingestion for RTSP/HTTP/capture-device-style sources supported by OpenCV.
+- Browser capture ingestion through `getDisplayMedia`, canvas frame sampling, and live frame POSTs.
+- Optional YOLO person detector backend when a local model is available.
+- Persistent 2D tactical state storage, CSV/JSONL export, and manager/analyst browser views.
+- Track identity correction for team, shirt number, player name, and role.
+- Quality telemetry for observed players, estimated players, identity coverage, processor backend, and processing latency.
+- Cache reuse for repeated full-match processing with identical settings.
+- Empty matches do not show invented tactical maps; Manager view unlocks only after real ingest writes stored states.
 
 ## Local Development
 
-Backend:
+One-command setup:
+
+```bash
+make setup
+```
+
+One-command local run:
+
+```bash
+make dev
+```
+
+The app will start:
+
+- Backend: `http://127.0.0.1:8000`
+- Frontend: `http://127.0.0.1:5173`
+
+Manual backend:
 
 ```bash
 cd backend
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,video]"
 uvicorn project_fm.api:app --reload --port 8000
 ```
 
-Frontend:
+Optional YOLO detector:
+
+```bash
+cd backend
+. .venv/bin/activate
+pip install -e ".[yolo]"
+PROJECT_FM_DETECTOR=yolo PROJECT_FM_YOLO_MODEL=/absolute/path/to/model.pt uvicorn project_fm.api:app --port 8000
+```
+
+If the YOLO package or model path is unavailable, Project FM keeps using the OpenCV detector instead of crashing during a trial.
+
+By default, file and stream ingest must decode real video frames. The baseline tactical generator is available only through the explicit `allow_baseline_fallback` development flag and is blocked from passing GTM trial gates.
+
+Optional local-network API token:
+
+```bash
+PROJECT_FM_API_TOKEN=change-this-token uvicorn project_fm.api:app --port 8000
+VITE_PROJECT_FM_API_TOKEN=change-this-token npm run dev
+```
+
+When `PROJECT_FM_API_TOKEN` is set, every API route except `/api/health` requires `x-project-fm-token`. This is a local-network protection layer, not full user authentication. Treat any non-loopback or club-footage deployment as requiring a private network, controlled device access, and a fresh token.
+
+Manual frontend:
 
 ```bash
 cd frontend
@@ -32,7 +81,25 @@ Do not commit match videos, model weights, local caches, credentials, or private
 
 ## Verification
 
-Current verified slice:
-- Backend schema, ingest, persistence, pipeline, and API tests.
+```bash
+make verify
+```
+
+## Trial Gate
+
+Run a GTM trial report against a club-supplied file:
+
+```bash
+make trial VIDEO=/absolute/path/to/match.mp4 DURATION_MS=60000 SAMPLE_EVERY_MS=1000
+```
+
+The trial command outputs JSON with pass/fail, processing metrics, observed-player count, identity coverage, quality warnings, and source metadata. It exits non-zero when the configured thresholds fail.
+
+Current verification coverage:
+
+- Backend schema, real-video ingest, OpenCV pipeline, live-frame API, persistence, cache, correction, CSV/JSONL export, path-safety, payload-limit, and quality summary tests.
+- GTM trial report pass/fail tests against synthetic OpenCV video, including calibration-threshold enforcement.
 - Frontend TypeScript/Vite build.
-- Browser QA for manager and analyst views at desktop and tablet widths.
+- Chrome headless smoke test for the no-ingest Manager state, Analyst ingest controls, browser-capture controls, desktop overflow, and mobile overflow.
+- `npm audit --audit-level=moderate`.
+- Secret/email scans excluding ignored local data, dependencies, docs, and generated output.

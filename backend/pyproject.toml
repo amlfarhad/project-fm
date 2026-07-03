@@ -22,6 +22,9 @@ dev = [
 video = [
   "opencv-python>=4.10",
 ]
+yolo = [
+  "ultralytics>=8.3",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

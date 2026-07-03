@@ -1,16 +1,18 @@
 import { Activity, CircleDot, Eye, Timer } from "lucide-react";
 import { Pitch } from "../components/Pitch";
-import type { TacticalState } from "../types";
+import type { MatchSummary, TacticalState } from "../types";
 
 interface ManagerViewProps {
   state: TacticalState;
+  summary: MatchSummary | null;
 }
 
-export function ManagerView({ state }: ManagerViewProps) {
+export function ManagerView({ state, summary }: ManagerViewProps) {
   const observed = state.players.filter((player) => player.observed).length;
   const estimated = state.players.length - observed;
   const confidence = (state.system_confidence * 100).toFixed(0);
   const matchTime = (state.timestamp_ms / 1000).toFixed(1);
+  const timelineLabel = summary?.states ? `${summary.states} states` : "live ingest";
 
   return (
     <main className="manager-shell">
@@ -47,6 +49,10 @@ export function ManagerView({ state }: ManagerViewProps) {
           <div className="rail-item">
             <span>Calibration</span>
             <strong>{state.pitch_calibration.status}</strong>
+          </div>
+          <div className="rail-item">
+            <span>Timeline</span>
+            <strong>{timelineLabel}</strong>
           </div>
         </aside>
         <Pitch state={state} />
