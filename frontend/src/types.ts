@@ -1,5 +1,7 @@
 export type Team = "home" | "away" | "referee" | "unknown";
 export type RoleHint = "goalkeeper" | "defender" | "midfielder" | "forward" | "referee" | "unknown";
+export type PositionStatus = "observed" | "inferred" | "corrected" | "unavailable";
+export type RuntimeMode = "local" | "hosted-demo";
 
 export interface BallState {
   pitch_x: number;
@@ -19,6 +21,7 @@ export interface PlayerState {
   confidence: number;
   last_observed_ms: number;
   source_bbox: number[] | null;
+  position_status?: PositionStatus;
 }
 
 export interface CalibrationState {
@@ -64,12 +67,68 @@ export interface MatchSummary {
   realtime_factor: number | null;
   corrections: number;
   processor_backend: string | null;
+  provenance: SourceProvenance | null;
+}
+
+export interface SourceProvenance {
+  source_kind: "real_video" | "synthetic_replay" | "browser_capture" | "stream_url";
+  execution_mode: "local_pipeline" | "precomputed_pipeline" | "synthetic_fallback" | "live_capture";
+  input_label: string;
+  source_reference: string | null;
+  video_url: string | null;
+  license: string | null;
+  license_url: string | null;
+  attribution: string | null;
+  pipeline_commit: string | null;
+  processor_backend: string | null;
+  stages: string[];
+  limitations: string[];
+}
+
+export interface SampleSource {
+  id: string;
+  label: string;
+  description: string;
+  source_kind: "real_video";
+  video_url: string;
+  artifact_url: string;
+  local_path: string;
+  duration_ms: number;
+  width: number;
+  height: number;
+  fps: number;
+  license: string;
+  license_url: string;
+  source_reference: string;
+  attribution: string;
+  default_sample_every_ms: number;
+  processing_note: string;
+}
+
+export interface StaticSampleArtifact {
+  artifact_version: number;
+  generated_by: string;
+  generated_elapsed_ms: number;
+  sample_id: string;
+  video_url: string;
+  provenance: SourceProvenance;
+  summary: MatchSummary;
+  states: TacticalState[];
 }
 
 export interface ProcessFilePayload {
   path: string | null;
   source_type: "file" | "stream_url";
   stream_url: string | null;
+  duration_ms: number | null;
+  sample_every_ms: number;
+  fps_hint: number | null;
+  replace_existing: boolean;
+  use_cache: boolean;
+}
+
+export interface ProcessSamplePayload {
+  sample_id: string;
   duration_ms: number | null;
   sample_every_ms: number;
   fps_hint: number | null;
@@ -102,6 +161,7 @@ export interface ProcessFileResult {
   cache_hit: boolean;
   processor_backend: string;
   probe: SourceProbe;
+  provenance: SourceProvenance;
 }
 
 export interface LiveFramePayload {

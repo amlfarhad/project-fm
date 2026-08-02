@@ -1,13 +1,15 @@
 import { Activity, CircleDot, Eye, Timer } from "lucide-react";
 import { Pitch } from "../components/Pitch";
-import type { MatchSummary, TacticalState } from "../types";
+import type { MatchSummary, RuntimeMode, TacticalState } from "../types";
 
 interface ManagerViewProps {
   state: TacticalState;
   summary: MatchSummary | null;
+  runtimeMode: RuntimeMode;
+  sampleLoaded: boolean;
 }
 
-export function ManagerView({ state, summary }: ManagerViewProps) {
+export function ManagerView({ state, summary, runtimeMode, sampleLoaded }: ManagerViewProps) {
   const observed = state.players.filter((player) => player.observed).length;
   const estimated = state.players.length - observed;
   const confidence = (state.system_confidence * 100).toFixed(0);
@@ -22,6 +24,9 @@ export function ManagerView({ state, summary }: ManagerViewProps) {
           <h1>Touchline Tactical Map</h1>
         </div>
         <div className="manager-status-row">
+          <div className="status-pill status-source" aria-label="Evidence mode">
+            {runtimeMode === "hosted-demo" ? "precomputed proof" : sampleLoaded ? "local pipeline" : "live-ready"}
+          </div>
           <div className="status-pill status-live" aria-label="System confidence">
             <Activity size={18} />
             {confidence}%
@@ -65,6 +70,7 @@ export function ManagerView({ state, summary }: ManagerViewProps) {
           <Timer size={14} /> {matchTime}s feed time
         </span>
         <span>{estimated} inferred rest-defense positions</span>
+        <span className="manager-evidence-note">Observed and inferred positions remain distinct in Analyst view</span>
       </footer>
     </main>
   );

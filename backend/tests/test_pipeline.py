@@ -105,6 +105,31 @@ def test_video_frame_processor_detects_players_from_pixels():
     assert all(player.source_bbox for player in observed)
 
 
+def test_video_frame_processor_labels_incomplete_detections_as_inferred():
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
+    image = np.zeros((540, 960, 3), dtype=np.uint8)
+    image[:, :] = (35, 115, 45)
+    cv2.rectangle(image, (70, 55), (890, 485), (48, 130, 58), thickness=-1)
+    processor = VideoFrameProcessor(match_id="incomplete")
+    frame = FrameMetadata(
+        frame_id="frame-0",
+        source_id="incomplete:blank.mp4",
+        source_type="file",
+        timestamp_ms=0,
+        wall_clock_ms=0,
+        width=960,
+        height=540,
+        fps_hint=25.0,
+        ingest_latency_ms=0,
+    )
+
+    state = processor.state_for_sample(SimpleNamespace(metadata=frame, image=image))
+
+    assert state.players
+    assert all(player.position_status == "inferred" for player in state.players)
+
+
 def test_video_frame_processor_keeps_tracks_stable_across_small_motion():
     processor = VideoFrameProcessor(match_id="cv-match")
 

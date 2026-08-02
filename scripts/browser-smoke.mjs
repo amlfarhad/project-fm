@@ -128,10 +128,27 @@ try {
     }
     await delay(100);
   }
-  await waitForText(client, "Ingest footage first");
-  await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => button.innerText.includes("Open analyst console")).click()`);
-  await waitForText(client, "File Ingest");
-  await waitForText(client, "Browser Capture");
+  await waitForText(client, "Open the repository sample");
+  if (process.env.PROJECT_FM_EXPECT_HOSTED === "1") {
+    await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => button.innerText.includes("Open the repository sample")).click()`);
+    await waitForText(client, "precomputed proof");
+    await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => button.innerText.trim() === "Analyst").click()`);
+    await waitForText(client, "Evidence and provenance");
+    await evaluate(client, `(() => { const range = document.querySelector('input[type="range"]'); if (!range) throw new Error("Timeline control missing"); range.value = range.max; range.dispatchEvent(new Event("input", { bubbles: true })); range.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+    await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => (button.getAttribute("aria-label") || "").startsWith("Save correction")).click()`);
+    let correctionSaved = false;
+    for (let index = 0; index < 20; index += 1) {
+      correctionSaved = await evaluate(client, `Boolean(document.querySelector(".position-status-corrected"))`);
+      if (correctionSaved) break;
+      await delay(50);
+    }
+    if (!correctionSaved) throw new Error("Correction did not persist in hosted proof");
+    await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => button.innerText.trim() === "CSV").click()`);
+  } else {
+    await evaluate(client, `Array.from(document.querySelectorAll("button")).find((button) => button.innerText.includes("Open analyst console")).click()`);
+    await waitForText(client, "File Ingest");
+    await waitForText(client, "Browser Capture");
+  }
   const desktopWidth = await evaluate(client, "document.documentElement.scrollWidth");
   if (desktopWidth > 1440) {
     throw new Error(`Desktop layout overflowed: ${desktopWidth}px`);

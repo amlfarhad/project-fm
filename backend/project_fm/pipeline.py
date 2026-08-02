@@ -128,6 +128,7 @@ class BaselineProcessor:
             confidence=confidence,
             last_observed_ms=timestamp_ms if observed else max(0, timestamp_ms - 4000),
             source_bbox=[0, 0, 0, 0] if observed else None,
+            position_status="observed" if observed else "inferred",
         )
 
 
@@ -457,6 +458,7 @@ class VideoFrameProcessor:
                     confidence=round(confidence, 3),
                     last_observed_ms=timestamp_ms,
                     source_bbox=detection.bbox,
+                    position_status="observed",
                 )
             )
         return players
@@ -539,6 +541,7 @@ class VideoFrameProcessor:
                             "confidence": 0.42,
                             "last_observed_ms": max(0, timestamp_ms - 5000),
                             "source_bbox": None,
+                            "position_status": "inferred",
                         }
                     )
                 )

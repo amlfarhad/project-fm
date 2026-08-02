@@ -6,6 +6,8 @@ import type {
   ProcessFilePayload,
   ProcessFileResult,
   ProcessJob,
+  ProcessSamplePayload,
+  SampleSource,
   SourceProbe,
   TacticalState,
   TrackCorrection,
@@ -16,6 +18,25 @@ const apiToken = ((import.meta as unknown as { env?: Record<string, string | und
 
 function apiHeaders(extra: HeadersInit = {}): HeadersInit {
   return apiToken ? { ...extra, "x-project-fm-token": apiToken } : extra;
+}
+
+export async function fetchHealth(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/health", { headers: apiHeaders() });
+    if (!response.ok) return false;
+    const payload = (await response.json()) as { status?: string };
+    return payload.status === "ok";
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchSamples(): Promise<SampleSource[]> {
+  const response = await fetch("/api/samples", { headers: apiHeaders() });
+  if (!response.ok) {
+    throw await parseError(response, `Failed to fetch sample catalog: ${response.status}`);
+  }
+  return response.json();
 }
 
 async function parseError(response: Response, fallback: string): Promise<Error> {
@@ -80,6 +101,21 @@ export async function startProcessMatchFileJob(
   });
   if (!response.ok) {
     throw await parseError(response, `Failed to start process job: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function startProcessSampleJob(
+  matchId: string,
+  payload: ProcessSamplePayload,
+): Promise<ProcessJob> {
+  const response = await fetch(`/api/matches/${matchId}/process-sample-job`, {
+    method: "POST",
+    headers: apiHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw await parseError(response, `Failed to start sample processing: ${response.status}`);
   }
   return response.json();
 }

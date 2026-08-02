@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
+import time
 
 from project_fm.api import app
 
@@ -11,6 +12,7 @@ def wait_for_job(client: TestClient, job_id: str):
         payload = response.json()
         if payload["status"] in {"succeeded", "failed"}:
             return payload
+        time.sleep(0.05)
     raise AssertionError("process job did not finish")
 
 
@@ -86,6 +88,42 @@ def test_health_endpoint():
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_sample_catalog_exposes_licensed_pipeline_proof():
+    client = TestClient(app)
+
+    response = client.get("/api/samples")
+
+    assert response.status_code == 200
+    sample = response.json()[0]
+    assert sample["id"] == "commons-galatasaray-2008"
+    assert sample["source_kind"] == "real_video"
+    assert sample["license"] == "Public domain"
+    assert sample["video_url"].endswith("galatasaray-steau-2008-12s.mp4")
+    assert sample["artifact_url"].endswith("galatasaray-steau-2008-12s.states.json")
+
+
+def test_sample_process_job_records_provenance_and_position_status(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROJECT_FM_DATA_ROOT", str(tmp_path / "data"))
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/matches/sample/process-sample-job",
+        json={"sample_id": "commons-galatasaray-2008", "duration_ms": 1000, "sample_every_ms": 1000},
+    )
+
+    assert response.status_code == 200
+    completed = wait_for_job(client, response.json()["job_id"])
+    assert completed["status"] == "succeeded"
+    assert completed["result"]["provenance"]["execution_mode"] == "local_pipeline"
+    assert completed["result"]["provenance"]["source_kind"] == "real_video"
+
+    latest = client.get("/api/matches/sample/latest-state").json()
+    statuses = {player["position_status"] for player in latest["players"]}
+    assert "observed" in statuses
+    assert "inferred" in statuses
+    assert client.get("/api/matches/sample/summary").json()["provenance"]["license"] == "Public domain"
 
 
 def test_api_token_protects_match_endpoints_but_not_health(tmp_path, monkeypatch):
@@ -218,6 +256,21 @@ def test_process_match_endpoint_rejects_non_video_without_explicit_fallback(tmp_
     assert response.status_code == 422
     assert "video" in response.json()["detail"].lower()
     assert summary.json()["states"] == 0
+
+
+def test_process_match_endpoint_rejects_unsupported_or_truncated_codec(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROJECT_FM_DATA_ROOT", str(tmp_path / "data"))
+    unsupported = tmp_path / "truncated-video.mkv"
+    unsupported.write_bytes(b"not a complete video container")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/matches/codec/process-file",
+        json={"path": str(unsupported), "duration_ms": 1000, "sample_every_ms": 500, "use_cache": False},
+    )
+
+    assert response.status_code == 422
+    assert "video" in response.json()["detail"].lower()
 
 
 def test_process_match_endpoint_allows_baseline_fallback_only_when_explicit(tmp_path, monkeypatch):
@@ -505,6 +558,7 @@ def test_track_correction_applies_to_latest_timeline_summary_and_export(tmp_path
     assert corrected_latest["player_name"] == "=Test Midfielder"
     assert corrected_latest["role_hint"] == "midfielder"
     assert corrected_latest["confidence"] == 0.92
+    assert corrected_latest["position_status"] == "corrected"
     assert corrected_timeline_state["team"] == "away"
     assert summary_response.json()["corrections"] == 1
     assert f",{target_track},away,44,midfielder,'=Test Midfielder," in csv_response.text

@@ -18,13 +18,21 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from project_fm.config import get_settings
-from project_fm.domain import FrameMetadata, RoleHint, TacticalState, Team
+from project_fm.domain import FrameMetadata, RoleHint, SourceProvenance, TacticalState, Team
 from project_fm.ingest import FileVideoSource, OpenCVStreamSource, SourceUnavailableError
 from project_fm.persistence import InvalidMatchId, MatchStateStore
 from project_fm.pipeline import BaselineProcessor, VideoFrameProcessor
 
 SourceMode = Literal["file", "stream_url"]
 MAX_LIVE_IMAGE_DATA_CHARS = 6_000_000
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SAMPLE_ID = "commons-galatasaray-2008"
+SAMPLE_VIDEO_PATH = PROJECT_ROOT / "frontend" / "public" / "samples" / "galatasaray-steau-2008-12s.mp4"
+SAMPLE_ARTIFACT_PATH = PROJECT_ROOT / "frontend" / "public" / "samples" / "galatasaray-steau-2008-12s.states.json"
+SAMPLE_VIDEO_URL = "/samples/galatasaray-steau-2008-12s.mp4"
+SAMPLE_ARTIFACT_URL = "/samples/galatasaray-steau-2008-12s.states.json"
+SAMPLE_SOURCE_REFERENCE = "https://commons.wikimedia.org/wiki/File:Galatasaray-Steau_Bükreş-1.ogv"
+SAMPLE_LICENSE_URL = "https://creativecommons.org/public-domain/mark/1.0/"
 
 
 class ProcessFileRequest(BaseModel):
@@ -37,6 +45,15 @@ class ProcessFileRequest(BaseModel):
     replace_existing: bool = True
     use_cache: bool = True
     allow_baseline_fallback: bool = False
+
+
+class ProcessSampleRequest(BaseModel):
+    sample_id: str = SAMPLE_ID
+    duration_ms: int | None = Field(default=12_000, gt=0)
+    sample_every_ms: int = Field(default=1000, gt=0)
+    fps_hint: float | None = Field(default=None, gt=0)
+    replace_existing: bool = True
+    use_cache: bool = True
 
 
 class ProcessFileResponse(BaseModel):
@@ -52,6 +69,7 @@ class ProcessFileResponse(BaseModel):
     cache_hit: bool = False
     processor_backend: str
     probe: "SourceProbeResponse"
+    provenance: SourceProvenance
 
 
 class ProcessJobResponse(BaseModel):
@@ -147,6 +165,27 @@ class MatchSummary(BaseModel):
     realtime_factor: float | None
     corrections: int
     processor_backend: str | None
+    provenance: SourceProvenance | None = None
+
+
+class SampleSourceResponse(BaseModel):
+    id: str
+    label: str
+    description: str
+    source_kind: str
+    video_url: str
+    artifact_url: str
+    local_path: str
+    duration_ms: int
+    width: int
+    height: int
+    fps: float
+    license: str
+    license_url: str
+    source_reference: str
+    attribution: str
+    default_sample_every_ms: int
+    processing_note: str
 
 
 app = FastAPI(title="Project FM API")
@@ -175,6 +214,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/samples")
+def list_samples() -> list[SampleSourceResponse]:
+    return [sample_descriptor()] if SAMPLE_VIDEO_PATH.is_file() else []
+
+
+@app.post("/api/matches/{match_id}/process-sample-job")
+def start_process_sample_job(match_id: str, request: ProcessSampleRequest) -> ProcessJobResponse:
+    if request.sample_id != SAMPLE_ID or not SAMPLE_VIDEO_PATH.is_file():
+        raise HTTPException(status_code=404, detail=f"Sample source not found: {request.sample_id}")
+    file_request = ProcessFileRequest(
+        path=str(SAMPLE_VIDEO_PATH),
+        source_type="file",
+        duration_ms=request.duration_ms,
+        sample_every_ms=request.sample_every_ms,
+        fps_hint=request.fps_hint,
+        replace_existing=request.replace_existing,
+        use_cache=request.use_cache,
+    )
+    return start_process_file_job(match_id=match_id, request=file_request)
+
+
 @app.middleware("http")
 async def require_api_token(request: Request, call_next):
     token = get_settings().api_token
@@ -187,6 +247,91 @@ async def require_api_token(request: Request, call_next):
 
 def get_store() -> MatchStateStore:
     return MatchStateStore(get_settings().data_root)
+
+
+def sample_descriptor() -> SampleSourceResponse:
+    return SampleSourceResponse(
+        id=SAMPLE_ID,
+        label="Galatasaray–Steaua match clip / 2008",
+        description="A bounded public-domain match clip used to exercise the real OpenCV reconstruction path.",
+        source_kind="real_video",
+        video_url=SAMPLE_VIDEO_URL,
+        artifact_url=SAMPLE_ARTIFACT_URL,
+        local_path="repository-owned sample asset",
+        duration_ms=12_000,
+        width=640,
+        height=480,
+        fps=30.0,
+        license="Public domain",
+        license_url=SAMPLE_LICENSE_URL,
+        source_reference=SAMPLE_SOURCE_REFERENCE,
+        attribution="Original uploader Qwl; source clip released into the public domain.",
+        default_sample_every_ms=1000,
+        processing_note="Hosted demo serves the artifact produced by the OpenCV pipeline; local runs reprocess the clip.",
+    )
+
+
+def sample_provenance(execution_mode: str, processor_backend: str | None = None) -> SourceProvenance:
+    descriptor = sample_descriptor()
+    return SourceProvenance(
+        source_kind="real_video",
+        execution_mode=execution_mode,  # type: ignore[arg-type]
+        input_label=descriptor.label,
+        source_reference=descriptor.source_reference,
+        video_url=descriptor.video_url,
+        license=descriptor.license,
+        license_url=descriptor.license_url,
+        attribution=descriptor.attribution,
+        pipeline_commit="34c4397",
+        processor_backend=processor_backend,
+        stages=["input video", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
+        limitations=[
+            "Players outside the camera view are inferred and remain visually distinct from observed detections.",
+            "The CPU-safe OpenCV detector is a baseline; shirt-number recognition is not reliable on every frame.",
+            "The hosted demo is bounded and precomputed; it is not live footage processing.",
+        ],
+    )
+
+
+def provenance_for_request(
+    request: ProcessFileRequest,
+    source: FileVideoSource | OpenCVStreamSource,
+    processor_backend: str,
+) -> SourceProvenance:
+    if request.allow_baseline_fallback:
+        return SourceProvenance(
+            source_kind="synthetic_replay",
+            execution_mode="synthetic_fallback",
+            input_label="Deterministic fallback replay",
+            source_reference=None,
+            pipeline_commit="34c4397",
+            processor_backend=processor_backend,
+            stages=["synthetic state generator", "2D pitch state"],
+            limitations=["No decodable footage was processed; do not treat these positions as footage evidence."],
+        )
+    if isinstance(source, FileVideoSource) and source.path.resolve() == SAMPLE_VIDEO_PATH.resolve():
+        return sample_provenance("local_pipeline", processor_backend)
+    if request.source_type == "stream_url":
+        return SourceProvenance(
+            source_kind="stream_url",
+            execution_mode="local_pipeline",
+            input_label="Accessible stream source",
+            source_reference=source_locator(request),
+            pipeline_commit="34c4397",
+            processor_backend=processor_backend,
+            stages=["stream input", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
+            limitations=["Stream availability, camera cuts, and access permissions can interrupt reconstruction."],
+        )
+    return SourceProvenance(
+        source_kind="real_video",
+        execution_mode="local_pipeline",
+        input_label=Path(source_locator(request)).name or "Local video file",
+        source_reference=None,
+        pipeline_commit="34c4397",
+        processor_backend=processor_backend,
+        stages=["input video", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
+        limitations=["Players outside the camera view are inferred; model quality depends on camera angle and frame quality."],
+    )
 
 
 def live_processor_for(match_id: str) -> VideoFrameProcessor:
@@ -206,6 +351,13 @@ def reset_live_processor(match_id: str) -> None:
 def summarize_match(store: MatchStateStore, match_id: str) -> MatchSummary:
     latest = corrected_state(store, match_id, store.latest_state(match_id))
     manifest = store.read_manifest(match_id) or {}
+    provenance: SourceProvenance | None = None
+    raw_provenance = manifest.get("provenance")
+    if isinstance(raw_provenance, dict):
+        try:
+            provenance = SourceProvenance.model_validate(raw_provenance)
+        except ValueError:
+            provenance = None
     observed_players = sum(1 for player in latest.players if player.observed) if latest else None
     estimated_players = len(latest.players) - observed_players if latest and observed_players is not None else None
     shirt_numbered_players = sum(1 for player in latest.players if player.shirt_number is not None) if latest else None
@@ -272,6 +424,7 @@ def summarize_match(store: MatchStateStore, match_id: str) -> MatchSummary:
         processor_backend=(
             manifest.get("processor_backend") if isinstance(manifest.get("processor_backend"), str) else None
         ),
+        provenance=provenance,
     )
 
 
@@ -328,6 +481,7 @@ def corrected_state(
                     "player_name": correction.get("player_name"),
                     "role_hint": correction["role_hint"],
                     "confidence": max(player.confidence, 0.92),
+                    "position_status": "corrected",
                 },
             )
         )
@@ -532,6 +686,15 @@ def ingest_live_frame(match_id: str, request: LiveFrameRequest) -> LiveFrameResp
     store.append_state(state)
     processing_elapsed_ms = max(1, int((time.perf_counter() - started_at) * 1000))
     states_written = store.state_count(match_id)
+    provenance = SourceProvenance(
+        source_kind="browser_capture",
+        execution_mode="live_capture",
+        input_label=request.source_label,
+        pipeline_commit="34c4397",
+        processor_backend="opencv-live",
+        stages=["browser capture", "sampled frame", "player detection", "short-track association", "2D pitch state", "analyst review"],
+        limitations=["The browser capture depends on the operator's permission and the source's accessible pixels."],
+    )
     store.write_manifest(
         match_id,
         {
@@ -553,6 +716,7 @@ def ingest_live_frame(match_id: str, request: LiveFrameRequest) -> LiveFrameResp
             "processing_elapsed_ms": processing_elapsed_ms,
             "processing_fps": round(1000 / processing_elapsed_ms, 3),
             "realtime_factor": None,
+            "provenance": provenance.model_dump(),
         },
     )
     return LiveFrameResponse(
@@ -659,6 +823,17 @@ def run_process_file(
     existing_count = store.state_count(match_id)
     manifest = store.read_manifest(match_id) or {}
     if request.use_cache and request.replace_existing and existing_count > 0 and manifest_matches_request(manifest, signature):
+        cached_provenance = None
+        if isinstance(manifest.get("provenance"), dict):
+            try:
+                cached_provenance = SourceProvenance.model_validate(manifest["provenance"])
+            except ValueError:
+                cached_provenance = None
+        cached_provenance = cached_provenance or provenance_for_request(
+            request,
+            source,
+            manifest.get("processor_backend") if isinstance(manifest.get("processor_backend"), str) else "cache",
+        )
         return ProcessFileResponse(
             match_id=match_id,
             source_id=source.source_id,
@@ -685,6 +860,7 @@ def run_process_file(
             processor_backend=(
                 manifest.get("processor_backend") if isinstance(manifest.get("processor_backend"), str) else "cache"
             ),
+            provenance=cached_provenance,
             probe=SourceProbeResponse(
                 source_id=probe.source_id,
                 path=probe.path,
@@ -772,6 +948,7 @@ def run_process_file(
         if match_seconds is not None and processing_seconds > 0
         else None
     )
+    provenance = provenance_for_request(request, source, processor_backend)
 
     store.write_manifest(
         match_id,
@@ -795,6 +972,7 @@ def run_process_file(
             "processing_elapsed_ms": processing_elapsed_ms,
             "processing_fps": processing_fps,
             "realtime_factor": realtime_factor,
+            "provenance": provenance.model_dump(),
         },
     )
 
@@ -810,6 +988,7 @@ def run_process_file(
         realtime_factor=realtime_factor,
         cache_hit=False,
         processor_backend=processor_backend,
+        provenance=provenance,
         probe=SourceProbeResponse(
             source_id=probe.source_id,
             path=probe.path,

@@ -12,6 +12,10 @@ function teamClass(team: Team): string {
   return "player player-unknown";
 }
 
+function positionStatus(player: TacticalState["players"][number]): string {
+  return player.position_status ?? (player.observed ? "observed" : "inferred");
+}
+
 export function Pitch({ state, compact = false }: PitchProps) {
   return (
     <div className={compact ? "pitch-wrap pitch-wrap-compact" : "pitch-wrap"}>
@@ -29,7 +33,11 @@ export function Pitch({ state, compact = false }: PitchProps) {
           <circle className="ball" cx={state.ball.pitch_x} cy={state.ball.pitch_y} r="1.2" />
         )}
         {state.players.map((player) => (
-          <g key={player.track_id} className={player.observed ? "observed" : "estimated"}>
+          <g
+            key={player.track_id}
+            className={`player-state player-state-${positionStatus(player)}`}
+            aria-label={`${player.track_id}: ${positionStatus(player)} position`}
+          >
             <circle
               className={teamClass(player.team)}
               cx={player.pitch_x}

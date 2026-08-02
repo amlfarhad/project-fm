@@ -42,6 +42,7 @@ def test_tactical_state_round_trip():
     assert restored.match_id == "match-1"
     assert restored.players[0].track_id == "home-4"
     assert restored.players[0].source_bbox == [100, 120, 24, 58]
+    assert restored.players[0].position_status == "observed"
 
 
 def test_frame_metadata_records_source_details():
