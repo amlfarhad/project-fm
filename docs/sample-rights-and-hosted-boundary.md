@@ -15,8 +15,11 @@ make setup
 PROJECT_FM_PIPELINE_COMMIT="$(git rev-parse HEAD)" make demo-artifact
 PROJECT_FM_DATA_ROOT="$(mktemp -d)" make trial \
   VIDEO="$PWD/frontend/public/samples/galatasaray-steau-2008-12s.mp4" \
-  DURATION_MS=10000 SAMPLE_EVERY_MS=1000
+  DURATION_MS=10000 SAMPLE_EVERY_MS=1000 \
+  MIN_OBSERVED_PLAYERS=1 MIN_PROCESSING_FPS=0.1
 ```
+
+The public-domain clip is intentionally treated as a low-resolution, broadcast-style smoke sample. With the relaxed sample thresholds above it should return `pass_with_warnings`; the default thresholds remain stricter for club-supplied pilot footage.
 
 `make demo-artifact` runs the actual local pipeline and writes `frontend/public/samples/galatasaray-steau-2008-12s.states.json`. The artifact records the exact pipeline commit used to create it. Hosted deployments serve this immutable result; they do not claim to process live footage in the browser.
 
