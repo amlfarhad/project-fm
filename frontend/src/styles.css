@@ -305,6 +305,8 @@ h2 {
   border: 1px solid #2b3930;
   background: rgba(21, 28, 24, 0.96);
   padding: 16px;
+  min-width: 0;
+  max-width: 100%;
   animation: surface-enter 320ms ease both;
 }
 
@@ -314,6 +316,17 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.panel-heading > * {
+  min-width: 0;
+}
+
+.panel-system dd,
+.panel-system li,
+.panel-system p,
+.panel-system h3 {
+  overflow-wrap: anywhere;
 }
 
 .panel-heading span,
@@ -353,6 +366,8 @@ h2 {
 
 .panel-table {
   grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 

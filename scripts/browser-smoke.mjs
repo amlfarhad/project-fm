@@ -235,7 +235,22 @@ try {
   await delay(250);
   const mobileWidth = await evaluate(client, "document.documentElement.scrollWidth");
   if (mobileWidth > 390) {
-    throw new Error(`Mobile layout overflowed: ${mobileWidth}px`);
+    const overflowers = await evaluate(
+      client,
+      `JSON.stringify(Array.from(document.querySelectorAll("*")).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { tag: element.tagName, className: element.className, right: Math.round(rect.right), width: Math.round(rect.width) };
+      }).filter((item) => item.right > 390 && item.width > 0).sort((left, right) => right.right - left.right).slice(0, 8))`,
+    );
+    const containers = await evaluate(
+      client,
+      `JSON.stringify(Array.from(document.querySelectorAll(".analyst-shell, .analyst-grid, .panel-table, .panel")).map((element) => {
+        const rect = element.getBoundingClientRect();
+        const styles = getComputedStyle(element);
+        return { className: element.className, left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, minWidth: styles.minWidth, overflowX: styles.overflowX };
+      }))`,
+    );
+    throw new Error(`Mobile layout overflowed: ${mobileWidth}px; elements=${overflowers}; containers=${containers}`);
   }
   const exceptionCount = client.events.filter((event) => event.method === "Runtime.exceptionThrown").length;
   const consoleErrors = client.events.filter(
