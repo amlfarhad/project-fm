@@ -22,7 +22,7 @@ secret_findings="$(rg -n "sk-|api_key|secret|password|/Users/|\\.env" . \
   --glob '!data/**' \
   --glob '!scripts/verify-local.sh' \
   --glob '!.playwright-mcp/**' || true)"
-secret_findings="$(printf "%s\n" "$secret_findings" | rg -v "PROJECT_FM_DATA_ROOT|PROJECT_FM_DETECTOR|PROJECT_FM_YOLO_MODEL|PROJECT_FM_API_TOKEN|VITE_PROJECT_FM_API_TOKEN|process\\.env" || true)"
+secret_findings="$(printf "%s\n" "$secret_findings" | rg -v "PROJECT_FM_DATA_ROOT|PROJECT_FM_DETECTOR|PROJECT_FM_YOLO_MODEL|PROJECT_FM_API_TOKEN|VITE_PROJECT_FM_API_TOKEN|PROJECT_FM_PIPELINE_COMMIT|process\\.env" || true)"
 if [[ -n "$secret_findings" ]]; then
   printf "%s\n" "$secret_findings"
   echo "Secret/privacy scan failed."
