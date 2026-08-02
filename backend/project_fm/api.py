@@ -5,6 +5,8 @@ import uuid
 import base64
 import binascii
 import csv
+import os
+import subprocess
 from io import StringIO
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -271,6 +273,22 @@ def sample_descriptor() -> SampleSourceResponse:
     )
 
 
+def pipeline_commit() -> str:
+    configured = os.environ.get("PROJECT_FM_PIPELINE_COMMIT", "").strip()
+    if configured:
+        return configured
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()[:12]
+    except (OSError, subprocess.CalledProcessError):
+        return "unversioned-local"
+
+
 def sample_provenance(execution_mode: str, processor_backend: str | None = None) -> SourceProvenance:
     descriptor = sample_descriptor()
     return SourceProvenance(
@@ -282,7 +300,7 @@ def sample_provenance(execution_mode: str, processor_backend: str | None = None)
         license=descriptor.license,
         license_url=descriptor.license_url,
         attribution=descriptor.attribution,
-        pipeline_commit="34c4397",
+        pipeline_commit=pipeline_commit(),
         processor_backend=processor_backend,
         stages=["input video", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
         limitations=[
@@ -304,7 +322,7 @@ def provenance_for_request(
             execution_mode="synthetic_fallback",
             input_label="Deterministic fallback replay",
             source_reference=None,
-            pipeline_commit="34c4397",
+            pipeline_commit=pipeline_commit(),
             processor_backend=processor_backend,
             stages=["synthetic state generator", "2D pitch state"],
             limitations=["No decodable footage was processed; do not treat these positions as footage evidence."],
@@ -317,7 +335,7 @@ def provenance_for_request(
             execution_mode="local_pipeline",
             input_label="Accessible stream source",
             source_reference=source_locator(request),
-            pipeline_commit="34c4397",
+            pipeline_commit=pipeline_commit(),
             processor_backend=processor_backend,
             stages=["stream input", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
             limitations=["Stream availability, camera cuts, and access permissions can interrupt reconstruction."],
@@ -327,7 +345,7 @@ def provenance_for_request(
         execution_mode="local_pipeline",
         input_label=Path(source_locator(request)).name or "Local video file",
         source_reference=None,
-        pipeline_commit="34c4397",
+        pipeline_commit=pipeline_commit(),
         processor_backend=processor_backend,
         stages=["input video", "sampled frames", "player detection", "short-track association", "2D pitch state", "analyst review"],
         limitations=["Players outside the camera view are inferred; model quality depends on camera angle and frame quality."],
@@ -690,7 +708,7 @@ def ingest_live_frame(match_id: str, request: LiveFrameRequest) -> LiveFrameResp
         source_kind="browser_capture",
         execution_mode="live_capture",
         input_label=request.source_label,
-        pipeline_commit="34c4397",
+        pipeline_commit=pipeline_commit(),
         processor_backend="opencv-live",
         stages=["browser capture", "sampled frame", "player detection", "short-track association", "2D pitch state", "analyst review"],
         limitations=["The browser capture depends on the operator's permission and the source's accessible pixels."],
