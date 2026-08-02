@@ -264,11 +264,12 @@ try {
   const networkFailures = client.events.filter((event) => {
     if (event.method !== "Network.loadingFailed") return false;
     const url = requestUrls.get(event.params.requestId) ?? "";
+    if (event.params.canceled === true && !url) return false;
     return !(event.params.errorText === "net::ERR_ABORTED" && /\.(mp4|webm|ogv)(?:\?|$)/i.test(url));
   });
   if (exceptionCount > 0 || consoleErrors.length > 0 || networkFailures.length > 0) {
     throw new Error(
-      `Browser errors: runtime=${exceptionCount}, console=${JSON.stringify(consoleErrors.map((event) => ({ text: event.params.entry.text, url: event.params.entry.url })))}, network=${JSON.stringify(networkFailures.map((event) => ({ url: requestUrls.get(event.params.requestId), error: event.params.errorText })))}`,
+      `Browser errors: runtime=${exceptionCount}, console=${JSON.stringify(consoleErrors.map((event) => ({ text: event.params.entry.text, url: event.params.entry.url })))}, network=${JSON.stringify(networkFailures.map((event) => ({ requestId: event.params.requestId, url: requestUrls.get(event.params.requestId), error: event.params.errorText, canceled: event.params.canceled })))}`,
     );
   }
   client.close();
