@@ -41,12 +41,12 @@ type ViewMode = "manager" | "analyst";
 const DEFAULT_SAMPLE: SampleSource = {
   id: "commons-galatasaray-2008",
   label: "Galatasaray–Steaua match clip / 2008",
-  description: "A bounded public-domain match clip used to exercise the real OpenCV reconstruction path.",
+  description: "A 10-second bounded review window over a public-domain match clip used to exercise the real OpenCV reconstruction path.",
   source_kind: "real_video",
   video_url: "/samples/galatasaray-steau-2008-12s.mp4",
   artifact_url: "/samples/galatasaray-steau-2008-12s.states.json",
   local_path: "",
-  duration_ms: 12_000,
+  duration_ms: 10_000,
   width: 640,
   height: 480,
   fps: 30,
@@ -55,7 +55,7 @@ const DEFAULT_SAMPLE: SampleSource = {
   source_reference: "https://commons.wikimedia.org/wiki/File:Galatasaray-Steau_Bükreş-1.ogv",
   attribution: "Original uploader Qwl; source clip released into the public domain.",
   default_sample_every_ms: 1000,
-  processing_note: "Hosted demo serves the artifact produced by the OpenCV pipeline; local runs reprocess the clip.",
+  processing_note: "The hosted proof processes a bounded first-10-second window of the 12-second source through OpenCV; local runs can reprocess the source.",
 };
 
 function emptyTacticalState(matchId: string): TacticalState {
@@ -155,8 +155,10 @@ function resultForArtifact(artifact: StaticSampleArtifact): ProcessFileResult {
   };
 }
 
-function csvSafe(value: string): string {
-  return ["=", "+", "-", "@"].some((prefix) => value.startsWith(prefix)) ? `'${value}` : value;
+function csvSafe(value: unknown): string {
+  const text = String(value ?? "");
+  const safe = ["=", "+", "-", "@"].some((prefix) => text.startsWith(prefix)) ? `'${text}` : text;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 function downloadStaticExport(matchId: string, states: TacticalState[], format: "csv" | "jsonl") {
@@ -201,7 +203,7 @@ function downloadStaticExport(matchId: string, states: TacticalState[], format: 
                 player.confidence,
                 state.pitch_calibration.confidence,
                 state.system_confidence,
-              ].join(","),
+              ].map(csvSafe).join(","),
             ),
           ),
         ].join("\n");
@@ -319,10 +321,12 @@ export default function App() {
       setError(null);
       const [nextSummary, nextTimeline] = await Promise.all([fetchMatchSummary(matchId), fetchMatchStates(matchId)]);
       let nextState: TacticalState | null = null;
-      try {
-        nextState = await fetchLatestState(matchId);
-      } catch (loadError) {
-        if (!(loadError instanceof Error) || !loadError.message.includes("No stored tactical states")) throw loadError;
+      if (nextSummary.states > 0) {
+        try {
+          nextState = await fetchLatestState(matchId);
+        } catch (loadError) {
+          if (!(loadError instanceof Error) || !loadError.message.includes("No stored tactical states")) throw loadError;
+        }
       }
       setState(nextState);
       setSummary(nextSummary);
@@ -605,7 +609,7 @@ export default function App() {
               <button className="primary-action landing-primary" onClick={() => void processSample()}><Radio size={16} /> Open the repository sample</button>
               <button className="inline-action" onClick={() => setMode("analyst")}><Monitor size={16} /> Open analyst console</button>
             </div>
-            <div className="landing-proof"><span><strong>12s</strong> bounded input</span><span><strong>OpenCV</strong> real pipeline</span><span><strong>{runtimeMode === "hosted-demo" ? "precomputed" : "local"}</strong> execution boundary</span></div>
+            <div className="landing-proof"><span><strong>{Math.round(sample.duration_ms / 1000)}s</strong> review window</span><span><strong>OpenCV</strong> real pipeline</span><span><strong>{runtimeMode === "hosted-demo" ? "precomputed" : "local"}</strong> execution boundary</span></div>
           </section>
           <aside className="landing-card" aria-label="Sample provenance">
             <p className="section-kicker">Primary proof</p>

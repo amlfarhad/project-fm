@@ -35,6 +35,7 @@ SAMPLE_VIDEO_URL = "/samples/galatasaray-steau-2008-12s.mp4"
 SAMPLE_ARTIFACT_URL = "/samples/galatasaray-steau-2008-12s.states.json"
 SAMPLE_SOURCE_REFERENCE = "https://commons.wikimedia.org/wiki/File:Galatasaray-Steau_Bükreş-1.ogv"
 SAMPLE_LICENSE_URL = "https://creativecommons.org/public-domain/mark/1.0/"
+SAMPLE_PROCESS_DURATION_MS = 10_000
 
 
 class ProcessFileRequest(BaseModel):
@@ -51,7 +52,7 @@ class ProcessFileRequest(BaseModel):
 
 class ProcessSampleRequest(BaseModel):
     sample_id: str = SAMPLE_ID
-    duration_ms: int | None = Field(default=12_000, gt=0)
+    duration_ms: int | None = Field(default=SAMPLE_PROCESS_DURATION_MS, gt=0)
     sample_every_ms: int = Field(default=1000, gt=0)
     fps_hint: float | None = Field(default=None, gt=0)
     replace_existing: bool = True
@@ -255,12 +256,12 @@ def sample_descriptor() -> SampleSourceResponse:
     return SampleSourceResponse(
         id=SAMPLE_ID,
         label="Galatasaray–Steaua match clip / 2008",
-        description="A bounded public-domain match clip used to exercise the real OpenCV reconstruction path.",
+        description="A 10-second bounded review window over a public-domain match clip used to exercise the real OpenCV reconstruction path.",
         source_kind="real_video",
         video_url=SAMPLE_VIDEO_URL,
         artifact_url=SAMPLE_ARTIFACT_URL,
         local_path="repository-owned sample asset",
-        duration_ms=12_000,
+        duration_ms=SAMPLE_PROCESS_DURATION_MS,
         width=640,
         height=480,
         fps=30.0,
@@ -269,7 +270,7 @@ def sample_descriptor() -> SampleSourceResponse:
         source_reference=SAMPLE_SOURCE_REFERENCE,
         attribution="Original uploader Qwl; source clip released into the public domain.",
         default_sample_every_ms=1000,
-        processing_note="Hosted demo serves the artifact produced by the OpenCV pipeline; local runs reprocess the clip.",
+        processing_note="The hosted proof processes a bounded first-10-second window of the 12-second source through OpenCV; local runs can reprocess the source.",
     )
 
 

@@ -24,8 +24,8 @@ export async function fetchHealth(): Promise<boolean> {
   try {
     const response = await fetch("/api/health", { headers: apiHeaders() });
     if (!response.ok) return false;
-    const payload = (await response.json()) as { status?: string };
-    return payload.status === "ok";
+    const payload = (await response.json()) as { status?: string; mode?: string };
+    return payload.status === "ok" && payload.mode !== "hosted-demo";
   } catch {
     return false;
   }

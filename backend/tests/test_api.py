@@ -100,6 +100,8 @@ def test_sample_catalog_exposes_licensed_pipeline_proof():
     assert sample["id"] == "commons-galatasaray-2008"
     assert sample["source_kind"] == "real_video"
     assert sample["license"] == "Public domain"
+    assert sample["duration_ms"] == 10_000
+    assert "bounded" in sample["processing_note"]
     assert sample["video_url"].endswith("galatasaray-steau-2008-12s.mp4")
     assert sample["artifact_url"].endswith("galatasaray-steau-2008-12s.states.json")
 

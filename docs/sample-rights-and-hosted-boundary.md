@@ -2,7 +2,7 @@
 
 ## Repository-owned proof input
 
-The primary proof clip is `frontend/public/samples/galatasaray-steau-2008-12s.mp4`, a silent 12-second transcode of the first 12 seconds of [Galatasaray–Steaua match video](https://commons.wikimedia.org/wiki/File:Galatasaray-Steau_B%C3%BCkre%C5%9F-1.ogv). The Wikimedia Commons file identifies the uploader as Qwl and states that the original work was released into the public domain. The repository keeps the source reference, rights URL, attribution, and transcode boundary in the sample catalog and UI.
+The primary proof clip is `frontend/public/samples/galatasaray-steau-2008-12s.mp4`, a silent 12-second transcode of the first 12 seconds of [Galatasaray–Steaua match video](https://commons.wikimedia.org/wiki/File:Galatasaray-Steau_B%C3%BCkre%C5%9F-1.ogv). The hosted proof processes a 10-second bounded review window so the default review frame contains defensible detections; the full 12-second source remains available in the player and can be reprocessed locally. The Wikimedia Commons file identifies the uploader as Qwl and states that the original work was released into the public domain. The repository keeps the source reference, rights URL, attribution, and transcode boundary in the sample catalog and UI.
 
 The clip is a real video input, not a synthetic tactical replay. The generated state artifact is produced by `VideoFrameProcessor` and OpenCV. The deterministic `BaselineProcessor` remains available only as an explicit fallback for development and is labelled as synthetic when used.
 

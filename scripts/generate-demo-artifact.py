@@ -35,7 +35,7 @@ def main() -> None:
             match_id="commons-galatasaray-2008",
             request=ProcessFileRequest(
                 path=str(sample_path),
-                duration_ms=12_000,
+                duration_ms=10_000,
                 sample_every_ms=1000,
                 fps_hint=30.0,
                 replace_existing=True,
